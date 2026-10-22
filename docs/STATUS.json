@@ -1,0 +1,200 @@
+{
+  "lastUpdated": "2026-10-22T13:30Z",
+  "scoringPolicy": "0-10 against WCAG 2.1 AA+ + perf budget (ARCHITECTURE.md §7). Pass = score >= 8.5 AND zero console errors. Below that: ranked issues returned to builder, retry up to 4 rounds.",
+  "modules": {
+    "background-service-worker": {
+      "wave": 1,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "notes": "Minimal lifecycle-only worker: default state init, badge count, no business logic. Verified via extension-load harness check (service_worker target found, zero errors)."
+    },
+    "utils": {
+      "wave": 1,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "notes": "logger/perf/storage/messaging all degrade gracefully outside extension context (no chrome.* APIs), which turned out to be load-bearing for the Puppeteer harness running modules outside chrome-extension:// origin."
+    },
+    "meet-observer": {
+      "wave": 2,
+      "status": "pass",
+      "round": 2,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [
+        "Theme/screenshare detection is heuristic (aspect ratio + width thresholds, background-color luminance) since Meet's DOM/classnames are unofficial and unstable. Works correctly against the mock harness; real-Meet accuracy cannot be verified without a live call, which this project deliberately avoids touching."
+      ],
+      "fixedIssues": [
+        "CRITICAL (found while debugging reported magnifier glitches): getVideoTiles() did a blanket document.querySelectorAll('video') with no exclusion for the extension's OWN injected overlay DOM. Once magnifier.js clones <video> elements into its floating lens (appended to document.body), those clones matched the same query and got treated as new 'participant tiles' — a feedback loop: clone detected as a tile -> resolveMagnifiableRoot's common-ancestor balloons toward <body> -> next clone is of ~the whole page (including the lens itself) -> glitching, wrong content shown. Fixed by excluding any <video> inside an element carrying the (now-standardized) data-aa-overlay attribute every overlay container sets."
+      ],
+      "notes": "Narrow MutationObserver root (nearest common ancestor of tiles, not document.body) confirmed via harness log output. getVideoTiles() exclusion verified live: tile count stayed correct (3) with an overlay enabled, instead of ballooning from its own clones."
+    },
+    "contrast": {
+      "wave": 3,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "agent:a3d7e07bf2d0a0f9d",
+      "issues": [],
+      "fixedIssues": [
+        "CRITICAL (found in round 1 critic pass, fixed same round by integrator): contrast.js originally applied its filter via a CSS class + injected <style> rule, while colorblind.js wrote `element.style.filter` directly on the same resolved call-area root. Inline styles always win over stylesheet rules regardless of specificity, so enabling contrast+colorblind together silently dropped the contrast effect entirely. Migrated contrast.js to contribute through a new shared composition API (filter-registry.js: setFilterContribution/clearFilterContribution) instead of owning its own <style> element."
+      ],
+      "notes": "contrast-high vs baseline RMSE 9.2%, contrast-max vs contrast-high RMSE 3.3% (monotonic, visible). All lifecycle calls <1ms (budget 15ms). destroy() leaves zero DOM trace."
+    },
+    "colorblind": {
+      "wave": 3,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "agent:a2f2c0b2409bb9c00",
+      "issues": [],
+      "fixedIssues": [
+        "Migrated from direct `element.style.filter` writes to the shared filter-registry.js composition API (same root cause/fix as contrast.js above)."
+      ],
+      "notes": "Standard Brettel/Vienot correction matrices via hidden SVG + feColorMatrix, GPU-composited. protanopia/deuteranopia/tritanopia all visually distinct (RMSE 3.5%+ between modes). SVG defs + applied filter fully removed on destroy()."
+    },
+    "inversion": {
+      "wave": 3,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "agent:a3a29208a6d855533",
+      "issues": [],
+      "fixedIssues": [
+        "Migrated root (<html>) and per-tile counter-filter writes from direct `element.style.filter` to the shared filter-registry.js composition API, for consistency and to eliminate any future collision risk with another module targeting the same element.",
+        "User-reported (correctly): the photophobia preset used non-smart full invert as a 'forced dark mode' stand-in, but inverting Meet's default DARK theme makes it BRIGHTER, not darker — backwards for light sensitivity. Fixed by adding independent `invertColors`/`brightness` knobs: brightness<1 now dims the whole call area (video/images included, no exemptions needed) with no color inversion involved. invertColors defaults true so existing color-inversion use stays unaffected; the photophobia preset now sets invertColors:false, brightness:0.6."
+      ],
+      "notes": "Smart-invert correctly exempts video tiles/images (double-invert cancellation) while inverting surrounding chrome. Subscribes to meet:tiles-changed to keep exemptions in sync as participants join/leave (only when invertColors is on). destroy() restores exact prior inline filter values per node. Brightness composes into the same root filter contribution; exempt nodes only ever carry the plain invert counter-filter, and invert(invert(x))=x cancels regardless of where brightness sits, so exempt video/images still end up correctly dimmed with no extra bookkeeping."
+    },
+    "filter-registry": {
+      "wave": 3,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "notes": "Added CSS filter composition (setFilterContribution/clearFilterContribution) after the contrast/colorblind clobbering bug above. All three filter builder agents independently flagged this exact gap, a strong signal the fix targets the real seam."
+    },
+    "reading-ruler": {
+      "wave": 4,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "notes": "Three fixed bands positioned via transform only (no layout writes), driven by overlay-registry's shared rAF loop. mousemove listener is passive and only stashes a number. destroy() removes the single injected container and detaches the listener. Part of the dyslexia condition preset alongside dyslexia-font.js."
+    },
+    "magnifier": {
+      "wave": 4,
+      "status": "pass",
+      "round": 2,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "fixedIssues": [
+        "User-reported: random black circle/square flashes. Root cause: cloneContent() tore down the old clone BEFORE building the new one, leaving the lens visible with nothing but its black base background for a frame. Fixed by building the new clone and appending it first, then removing the previous one only after.",
+        "User-reported: lens showed content unrelated to the cursor position. Root cause: cloneContent() called stripIds() on the clone to avoid DOM id duplication, but Meet's (and this project's own mock's) layout-critical CSS can be id-selector-based (#call-area { display: grid; ... }) — stripping the id silently dropped that rule, collapsing a 3-column grid clone to stacked full-width blocks. Fixed by no longer stripping ids: the clone is inert (pointer-events: none) and appended after the live original in document order, so document.getElementById still resolves correctly.",
+        "Found investigating the two bugs above: getVideoTiles() was picking up the magnifier's own cloned <video> elements as new participant tiles (feedback loop) — see meet-observer's fixedIssues entry."
+      ],
+      "notes": "No pixel/MediaStream reads anywhere (ARCHITECTURE.md §8) — lens is a cloneNode(true) of the magnifiable root with live <video> srcObject references copied across. Clone cost is deferred off enable() onto the first onFrame tick to respect the 15ms lifecycle budget. destroy() pauses cloned videos, clears srcObject, and removes all DOM. Verified live, pixel-level: lens shows exact magnified content under the cursor with correct grid layout preserved. Doubles as the low-vision condition preset's dynamic zoom."
+    },
+    "overlay-registry": {
+      "wave": 4,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "notes": "Same shape/fault-isolation contract as filter-registry.js: safeCall wraps every lifecycle + onFrame call, a throwing module is disabled and torn down, one bad onFrame never stops others. Single shared rAF subscription per enabled module with an onFrame. Re-exports setFilterContribution/clearFilterContribution so overlays compose with active filters."
+    },
+    "invite-link": {
+      "wave": 9,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "notes": "utils/invite-link.js: encode/decode an accessibility preset into a Meet URL's fragment (#aa=...), never a server-visible part of the request. Whitelisted field set per module (ALLOWED_FIELDS) — a crafted link can only ever toggle this extension's own presentation-layer modules. content-main.js's applyInviteLinkPresetFromUrl() applies it directly (not solely via the async storage.onChange round-trip — a genuine race was found and fixed, see fixedIssues on content-main below) then persists, so the popup reflects it and the candidate can freely adjust/undo it. Verified: encode/decode round-trip (checkInviteLink harness section), and full load-time apply confirmed via a dedicated Puppeteer script loading the real production files (contrast(1.8) saturate(1.2) ended up applied to the page after navigating with a #aa= hash, zero console errors)."
+    },
+    "content-main": {
+      "wave": 9,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [],
+      "fixedIssues": [
+        "Race found while testing invite-link: start() fired loadAndApplyInitialState() (async, reads stored profile) and applyInviteLinkPresetFromUrl() (async, applies the URL preset) without sequencing them. Whichever's async storage round-trip resolved LAST won, so roughly half the time the invite-link preset got silently overwritten back to the candidate's stored defaults a moment after being applied. Fixed by awaiting loadAndApplyInitialState() before calling applyInviteLinkPresetFromUrl() — the preset now deterministically applies on top of the loaded state, never races it."
+      ],
+      "notes": "Only module that wires meet-observer, both registries, storage load/subscribe, popup status relay, and the invite-link apply step together. Top-level try/catch boundary (§6) confirmed to still log-and-continue rather than throw during this sequencing fix."
+    },
+    "dyslexia-font": {
+      "wave": 10,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [
+        "\"OpenDyslexic\" is named first in the font stack but not bundled with the extension (would need an actual font file shipped + @font-face, not done here) — it only applies if already installed on the user's system; otherwise falls through to Comic Sans MS / Verdana / Arial. The letter/word-spacing and line-height increases (the better-evidenced readability lever) apply regardless.",
+        "Can only affect Meet's OWN UI text (DOM) — cannot restyle text inside a shared screen, since that is decoded video pixels, not editable text. This is a hard technical limit, not a missed feature; flagged explicitly in-product rather than silently underdelivering."
+      ],
+      "notes": "Single injected <style> + a body class toggle — body.aa-dyslexia-active * — so there's nothing per-element to track for restoration beyond removing one <style> tag. Verified live: test-panel/Meet-chrome text visibly switches font + gets noticeably more letter/line spacing; screenshot comparison confirmed. One-time ~39ms enable() cost (full-page style recalc from the broad `*` selector) is over the 15ms lifecycle budget but accepted as a one-off toggle-time cost, same precedent as magnifier's clone cost."
+    },
+    "reduce-motion": {
+      "wave": 10,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [
+        "Does NOT (and cannot reliably) hide Meet's own toast/notification DOM — that would require knowing Meet's unofficial, unstable notification markup, which this project avoids guessing at. Scoped down from the original ask to just the always-safe, DOM-independent part: freezing CSS animations/transitions + optional video pause."
+      ],
+      "notes": "pauseVideos tracks exactly which <video> elements IT paused (pausedByUs Set) so it only ever resumes its own, and prunes entries for tiles no longer live on meet:tiles-changed (ARCHITECTURE.md §7 memory rule). Re-pauses newly-joined tiles automatically while the option stays on. Harness: reduce-motion-on/off and reduce-motion-pause-videos scenarios, zero console errors."
+    },
+    "privacy-view": {
+      "wave": 10,
+      "status": "pass",
+      "round": 1,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [
+        "Deliberately does NOT auto-detect 'which tile is mine' or hide a participant count — no reliable DOM signal for either on unofficial Meet markup. Click-to-hide (the user picks the tile) sidesteps that fragility entirely rather than guessing."
+      ],
+      "notes": "Hidden tile gets an opaque placeholder sibling, not display:none — the underlying <video> is never paused and Meet's own layout/stream logic keeps working; only the local pixels shown change. If the tile's parent isn't already a positioned containing block, sets position:relative and restores the exact prior value on unhide (same capture/restore discipline as focus-tracker's ring style used previously). Verified live via harness: privacy-view-hide-tile screenshot shows the correct tile covered with others untouched; privacy-view-unhide-tile confirms the click-to-restore round-trip."
+    },
+    "popup-ui": {
+      "wave": 10,
+      "status": "pass",
+      "round": 3,
+      "score": 9,
+      "builtBy": "integrator",
+      "issues": [
+        "Module-unavailable badges and chrome.tabs query require the 'activeTab' permission (and 'scripting', added alongside it to match ARCHITECTURE.md §8's stated allowance) — manifest.json previously only declared 'storage'."
+      ],
+      "notes": "popup.js writes exclusively through AA.storage.setSlice (never touches chrome.storage directly). Three additions on top of the original per-module toggle list: (1) accessible-invite-link generator (reads the active Meet tab's URL + currently-enabled modules, builds a shareable link via utils/invite-link.js, copy-to-clipboard); (2) a condition menu (CONDITIONS array) — 2 categories (Neurodivergență, Vedere/senzorial), each item a one-click preset combining existing + new modules, built on top of the same persist()/currentOptionsFor() plumbing manual toggles use, so a condition pick and a manual slider tweak are indistinguishable to the storage layer; (3) dyslexiaFont/reduceMotion/privacyView module sections (8 total now). Verified via harness: popup.html loads standalone, renders all 8 module sections, zero console errors."
+    }
+  },
+  "harness": {
+    "lastRunOverallPass": true,
+    "lastRunScenarioCount": 33,
+    "lastRunConsoleErrors": 0,
+    "extensionLoadCheck": "pass",
+    "popupCheck": "pass",
+    "notes": "tests/run.js covers waves 1-10: utils, meet-observer, 3 filters, 5 overlays + overlay-registry (33 scenarios against the mock Meet DOM, including dyslexia-font/reduce-motion/privacy-view on/off + a pause-videos + hide/unhide-tile round-trip), the popup page standalone (8 module sections, zero console errors), and a dedicated invite-link section (encode/decode round-trip, whitelist filtering, null-on-malformed-input, via the real utils/invite-link.js in-page). The invite-link apply-on-load flow (content-main.js) was additionally verified with a standalone Puppeteer script loading the real production files in manifest order — not part of the automated tests/run.js suite, documented here instead since it needed a scratch HTML fixture. real-content-script-injection remains inconclusive — a documented sandbox limitation (Puppeteer's bundled Chrome does not fire extension content_scripts on CDP-navigated pages here), not a code issue."
+  },
+  "openWork": [
+    "focus-tracker.js, spotlight.js, and content/dom/active-speaker.js (audio-driven speaker detection + auto-spotlight panel) were built, verified working, then explicitly REMOVED at the user's request in favor of the invite-link + condition-menu direction. Not a dead end to revisit without a new ask — captured here only so a future reader doesn't wonder where they went.",
+    "reduce-motion.js doesn't hide Meet's own notification toasts (unofficial DOM, out of scope — see its issues entry). If Meet's actual notification markup is ever inspected against a real account, this could be revisited.",
+    "dyslexia-font.js names \"OpenDyslexic\" but doesn't bundle the actual font file — a reasonable follow-up if pursued (SIL OFL licensed, freely redistributable) would ship a local .woff2 and add a real @font-face rule.",
+    "privacy-view.js and the condition menu don't auto-detect 'which tile is mine' — click-to-hide is the deliberate, more-reliable substitute. An auto-detect heuristic could be explored later only against real Meet DOM, not guessed at.",
+    "Captions / speech-to-text and a 'your name was mentioned' alert were explicitly skipped (user decision): the Web Speech API's broad-language transcription is cloud-based (audio sent to Google's speech servers), which conflicts with this project's zero-network privacy policy, especially given the job-interview context.",
+    "No popup unit/interaction test clicks a toggle and asserts AA.storage.setSlice was called (harness only verifies the page renders cleanly) — low risk since setSlice/getState are the same wave-1 utils already covered elsewhere.",
+    "real-content-script-injection check stays inconclusive in this sandbox; would need a real Chrome build or manual chrome://extensions load against meet.google.com to fully close out.",
+    "combo-all-active doesn't also toggle screenshare in the same scenario (screenshare-toggle is separate) — add a combined scenario if a stricter audit is wanted."
+  ]
+}
