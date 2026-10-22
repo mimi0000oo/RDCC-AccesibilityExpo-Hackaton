@@ -1,0 +1,12 @@
+{
+  "name": "accessability-for-google-meet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome MV3 extension: real-time accessibility overlays and filters for Google Meet.",
+  "scripts": {
+    "test:visual": "node tests/run.js"
+  },
+  "devDependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "name": "AccessABILITY for Google Meet",
+  "short_name": "AccessABILITY",
+  "version": "0.1.0",
+  "description": "Real-time accessibility overlays and visual filters for Google Meet: contrast modes, color-blind correction, color inversion, dyslexia reading ruler, screen magnifier, custom hotkeys, a focus mode (speaker spotlight, self-view hide, reaction hiding), and turning on Meet's own live captions. Supports shareable accessible-invite links so a recruiter can pre-set a candidate's profile. Everything is local-only, including the AI \"catch me up\" recap button (ADHD/autism), which summarizes recently captioned speech on this device.",
+  "icons": {
+    "16": "ui/icons/icon16.png",
+    "48": "ui/icons/icon48.png",
+    "128": "ui/icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "ui/popup/popup.html",
+    "default_icon": {
+      "16": "ui/icons/icon16.png",
+      "48": "ui/icons/icon48.png",
+      "128": "ui/icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": [
+        "utils/logger.js",
+        "utils/perf.js",
+        "utils/storage.js",
+        "utils/messaging.js",
+        "utils/invite-link.js",
+        "utils/floating-dock.js",
+        "content/dom/meet-observer.js",
+        "content/filters/filter-registry.js",
+        "content/filters/contrast.js",
+        "content/filters/colorblind.js",
+        "content/filters/inversion.js",
+        "content/overlays/overlay-registry.js",
+        "content/overlays/reading-ruler.js",
+        "content/overlays/magnifier.js",
+        "content/overlays/pause-videos.js",
+        "content/overlays/focus-mode.js",
+        "content/overlays/custom-hotkeys.js",
+        "content/overlays/live-captions.js",
+        "content/overlays/ai-recap.js",
+        "content/content-main.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content/main-world/media-guard.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    }
+  ],
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["https://meet.google.com/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self'"
+  },
+  "minimum_chrome_version": "114"
+}
