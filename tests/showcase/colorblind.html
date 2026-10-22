@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Color-Blind Correction Filter — Showcase</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #14161a;
+    --panel: #1d2026;
+    --panel-border: #2d313a;
+    --text: #e8eaed;
+    --muted: #9aa0a6;
+    --accent: #6b8ee0;
+    --accent-active: #4a6fc9;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+
+  header {
+    max-width: 960px;
+    margin: 0 auto 20px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin: 0 0 6px;
+  }
+
+  p.lede {
+    color: var(--muted);
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    display: grid;
+    gap: 20px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+
+  .panel h2 {
+    font-size: 1rem;
+    margin: 0 0 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    appearance: none;
+    border: 1px solid var(--panel-border);
+    background: #262a32;
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  button:hover {
+    background: #2f343d;
+  }
+
+  button.active {
+    background: var(--accent-active);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* ---- mock Meet call area: the element the filter module targets ---- */
+  #meet-call-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    background: #000;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .tile {
+    background: #0b0b0b;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .tile .tile-label {
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Ishihara-style plate: a circle of colored dots with a hidden figure
+     picked out in a confusable red/brown hue against green/olive dots. */
+  .plate {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    background: #5a7a1f;
+  }
+
+  .plate .dot {
+    position: absolute;
+    border-radius: 50%;
+  }
+
+  .swatch-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .swatch {
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: rgba(0, 0, 0, 0.55);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  #log {
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 0.78rem;
+    background: #0b0d10;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 12px;
+    height: 180px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  #log .log-error { color: #ff6b6b; }
+  #log .log-warn { color: #ffcc66; }
+  #log .log-info { color: #9aa0a6; }
+
+  .status-line {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .status-line strong {
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Color-Blind Correction Filter — Showcase</h1>
+  <p class="lede">
+    Standalone harness for <code>content/filters/colorblind.js</code>. The buttons below call the
+    real module's <code>enable()</code>, <code>update()</code>, and <code>disable()</code> directly —
+    no mocking of the filter logic itself. The "call area" below is a stand-in for Google Meet's
+    video grid; the module resolves its common ancestor and applies
+    <code>style.filter = url(#aa-cvd-&lt;mode&gt;)</code> to it, exactly as it would in Meet.
+  </p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Controls</h2>
+    <div class="controls">
+      <button id="btn-off" class="active" type="button">Off</button>
+      <button id="btn-protanopia" type="button">Protanopia</button>
+      <button id="btn-deuteranopia" type="button">Deuteranopia</button>
+      <button id="btn-tritanopia" type="button">Tritanopia</button>
+    </div>
+    <label class="status-line">Correction strength
+      <input type="range" id="range-intensity" min="0" max="100" step="5" value="100" />
+      <strong id="status-intensity">100%</strong>
+    </label>
+    <div class="status-line">Active mode: <strong id="status-mode">off</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>Mock call area (filter target)</h2>
+    <div id="meet-call-area">
+      <div class="tile" id="tile-1">
+        <span class="tile-label">Ishihara-style plate</span>
+        <div class="plate" id="plate"></div>
+      </div>
+      <div class="tile" id="tile-2">
+        <span class="tile-label">Classic confusable hues</span>
+        <div class="swatch-row">
+          <div class="swatch" style="background:#c0392b;">Red</div>
+          <div class="swatch" style="background:#5a8f29;">Green</div>
+          <div class="swatch" style="background:#7b4a26;">Brown</div>
+          <div class="swatch" style="background:#d9822b;">Orange</div>
+        </div>
+        <div class="swatch-row">
+          <div class="swatch" style="background:#2e5fa3;">Blue</div>
+          <div class="swatch" style="background:#d9c22b;">Yellow</div>
+          <div class="swatch" style="background:#6a3fa0;">Purple</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Console log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+
+<!-- utils, in dependency order -->
+<script src="../../utils/logger.js"></script>
+<script src="../../utils/perf.js"></script>
+
+<!-- minimal registry stub: colorblind.js self-registers against it on load -->
+<script>
+  window.AA = window.AA || {};
+  window.AA.filterRegistry = { register: function () {} };
+</script>
+
+<script src="../../content/filters/colorblind.js"></script>
+
+<script>
+  (function () {
+    "use strict";
+
+    // ---- mirror console output into the on-page #log panel ----
+    const logEl = document.getElementById("log");
+    function appendLog(level, args) {
+      const line = document.createElement("div");
+      line.className = "log-" + level;
+      const text = args
+        .map((a) => {
+          if (a instanceof Error) return a.message;
+          if (typeof a === "object") {
+            try {
+              return JSON.stringify(a);
+            } catch (_) {
+              return String(a);
+            }
+          }
+          return String(a);
+        })
+        .join(" ");
+      line.textContent = "[" + level.toUpperCase() + "] " + text;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    ["log", "info", "warn", "error", "debug"].forEach((level) => {
+      const original = console[level].bind(console);
+      console[level] = function (...args) {
+        original(...args);
+        const mapped = level === "log" ? "info" : level;
+        appendLog(mapped, args);
+      };
+    });
+
+    // ---- build the Ishihara-style plate: dots in a confusable figure ----
+    // A simple "V" checkmark picked out in red/brown dots against a field
+    // of green/olive dots -- classic red-green confusion pairing. Positions
+    // are generated deterministically so the plate looks the same on every
+    // load.
+    (function buildPlate() {
+      const plate = document.getElementById("plate");
+      if (!plate) return;
+
+      const SIZE = 220;
+      const R = SIZE / 2;
+      const bgHues = ["#5a7a1f", "#6b8e23", "#7ea832", "#4f6b1a"];
+      const fgHues = ["#c0392b", "#a0522d", "#b5451f", "#8a3a1e"];
+
+      // Figure mask: a simple checkmark made of two line segments, tested
+      // via point-to-segment distance against each dot's center.
+      function distToSegment(px, py, ax, ay, bx, by) {
+        const abx = bx - ax;
+        const aby = by - ay;
+        const apx = px - ax;
+        const apy = py - ay;
+        const lenSq = abx * abx + aby * aby;
+        let t = lenSq > 0 ? (apx * abx + apy * aby) / lenSq : 0;
+        t = Math.max(0, Math.min(1, t));
+        const cx = ax + t * abx;
+        const cy = ay + t * aby;
+        return Math.hypot(px - cx, py - cy);
+      }
+
+      function isFigure(x, y) {
+        // checkmark: short down-stroke then long up-stroke
+        const d1 = distToSegment(x, y, 70, 110, 95, 150);
+        const d2 = distToSegment(x, y, 95, 150, 165, 60);
+        return d1 < 14 || d2 < 14;
+      }
+
+      let seed = 7;
+      function rand() {
+        // deterministic LCG so layout is stable across loads
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      }
+
+      const dotCount = 260;
+      for (let i = 0; i < dotCount; i++) {
+        const angle = rand() * Math.PI * 2;
+        const radius = Math.sqrt(rand()) * (R - 6);
+        const x = R + Math.cos(angle) * radius;
+        const y = R + Math.sin(angle) * radius;
+        const size = 4 + rand() * 7;
+
+        const dot = document.createElement("div");
+        dot.className = "dot";
+        const palette = isFigure(x, y) ? fgHues : bgHues;
+        dot.style.background = palette[Math.floor(rand() * palette.length)];
+        dot.style.width = size + "px";
+        dot.style.height = size + "px";
+        dot.style.left = x - size / 2 + "px";
+        dot.style.top = y - size / 2 + "px";
+        plate.appendChild(dot);
+      }
+    })();
+
+    // ---- mock ModuleContext per ARCHITECTURE.md section 4 ----
+    const tiles = Array.from(document.querySelectorAll("#meet-call-area .tile"));
+
+    const ctx = {
+      meet: {
+        getVideoTiles: () => tiles,
+        getScreenshareNode: () => null,
+        getTheme: () => "dark",
+        on: () => () => {},
+      },
+      storage: {
+        getSlice: async () => ({ enabled: false, mode: "deuteranopia" }),
+        onChange: () => () => {},
+      },
+      logger: window.AA.logger ? window.AA.logger.scope("colorblind-showcase") : console,
+      reportError: (err) => console.error("reportError:", err),
+    };
+
+    const mod = window.AA.filters && window.AA.filters.colorblind;
+    if (!mod) {
+      console.error("AA.filters.colorblind did not register — check script load order");
+      return;
+    }
+
+    mod.init(ctx);
+
+    // ---- wire buttons to the real module API ----
+    const buttons = {
+      off: document.getElementById("btn-off"),
+      protanopia: document.getElementById("btn-protanopia"),
+      deuteranopia: document.getElementById("btn-deuteranopia"),
+      tritanopia: document.getElementById("btn-tritanopia"),
+    };
+    const statusEl = document.getElementById("status-mode");
+    const rangeIntensity = document.getElementById("range-intensity");
+    const statusIntensity = document.getElementById("status-intensity");
+
+    let currentlyEnabled = false;
+    let currentMode = "deuteranopia";
+
+    function setActiveButton(key) {
+      Object.entries(buttons).forEach(([k, btn]) => {
+        if (!btn) return;
+        btn.classList.toggle("active", k === key);
+      });
+      statusEl.textContent = key;
+    }
+
+    buttons.off.addEventListener("click", () => {
+      mod.disable();
+      currentlyEnabled = false;
+      setActiveButton("off");
+    });
+
+    ["protanopia", "deuteranopia", "tritanopia"].forEach((mode) => {
+      buttons[mode].addEventListener("click", () => {
+        currentMode = mode;
+        const intensity = Number(rangeIntensity.value);
+        if (!currentlyEnabled) {
+          mod.enable({ enabled: true, mode, intensity });
+          currentlyEnabled = true;
+        } else {
+          mod.update({ enabled: true, mode, intensity });
+        }
+        setActiveButton(mode);
+      });
+    });
+
+    // Live-adjust correction strength while a mode is active — plain SVG
+    // attribute update under the hood, no per-frame JS (ARCHITECTURE.md §7).
+    rangeIntensity.addEventListener("input", () => {
+      const intensity = Number(rangeIntensity.value);
+      statusIntensity.textContent = intensity + "%";
+      if (!currentlyEnabled) return;
+      mod.update({ enabled: true, mode: currentMode, intensity });
+    });
+  })();
+</script>
+
+</body>
+</html>

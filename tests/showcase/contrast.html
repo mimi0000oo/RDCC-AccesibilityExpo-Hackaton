@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Contrast Filter — Showcase</title>
+<style>
+  :root {
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #121317;
+    color: #e8e8ea;
+  }
+  header {
+    padding: 20px 24px 8px;
+  }
+  header h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+  }
+  header p {
+    margin: 0;
+    color: #a3a3ab;
+    font-size: 13px;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 24px;
+    flex-wrap: wrap;
+  }
+  .controls button {
+    appearance: none;
+    border: 1px solid #3a3a42;
+    background: #1f1f26;
+    color: #e8e8ea;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .controls button:hover { background: #2a2a33; }
+  .controls button.active {
+    background: #4f7cff;
+    border-color: #4f7cff;
+    color: #fff;
+    font-weight: 600;
+  }
+  .controls .status {
+    margin-left: 8px;
+    font-size: 13px;
+    color: #a3a3ab;
+  }
+
+  /* ---- Mock Google Meet call area ---- */
+  #meet-call-area {
+    margin: 12px 24px 0;
+    border: 1px solid #2a2a32;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0b0c10;
+  }
+
+  .toolbar-mock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #1a1b20;
+    border-bottom: 1px solid #26272e;
+    font-size: 13px;
+  }
+  .toolbar-mock .meeting-code {
+    color: #cfcfd6;
+    letter-spacing: 0.5px;
+  }
+  .toolbar-mock .toolbar-icons {
+    display: flex;
+    gap: 10px;
+  }
+  .toolbar-mock .toolbar-icons span {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2e2f38;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .toolbar-mock .toolbar-icons span.end-call {
+    background: #c23b3b;
+  }
+
+  .tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .video-tile {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+  .video-tile.tile-1 {
+    background: linear-gradient(135deg, #3a4a6b 0%, #1d2435 50%, #0f1320 100%);
+  }
+  .video-tile.tile-2 {
+    background: linear-gradient(135deg, #6b4a3a 0%, #35241d 50%, #20140f 100%);
+  }
+  .video-tile.tile-3 {
+    background: linear-gradient(135deg, #3a6b4a 0%, #1d3524 50%, #0f2014 100%);
+  }
+
+  .caption-text {
+    padding: 12px 16px 18px;
+    display: grid;
+    gap: 10px;
+  }
+  .caption-text .block {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .caption-text .block.on-dark {
+    background: #15161b;
+    color: #cfcfd6;
+  }
+  .caption-text .block.on-light {
+    background: #e9e9ee;
+    color: #2a2a32;
+  }
+
+  #log-wrap {
+    margin: 20px 24px 24px;
+  }
+  #log-wrap h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8c8c94;
+    margin: 0 0 6px;
+  }
+  #log {
+    background: #0b0c10;
+    border: 1px solid #26272e;
+    border-radius: 6px;
+    padding: 10px 12px;
+    height: 140px;
+    overflow-y: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b7c4d6;
+  }
+  #log .log-line { white-space: pre-wrap; }
+  #log .log-warn { color: #e0b84f; }
+  #log .log-error { color: #e06464; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Contrast Filter — Showcase</h1>
+    <p>
+      Standalone test harness for <code>content/filters/contrast.js</code>. The bordered
+      panel below mocks a Google Meet call area (toolbar + video tiles + caption text);
+      everything outside it (these controls, the log) is intentionally left unfiltered to
+      show the module only touches the call area it resolves via
+      <code>ctx.meet.getVideoTiles()</code>.
+    </p>
+  </header>
+
+  <div class="controls">
+    <button id="btn-off" type="button">Off</button>
+    <button id="btn-high" type="button">High</button>
+    <button id="btn-max" type="button">Max</button>
+    <button id="btn-custom" type="button">Custom</button>
+    <label>Contrast <input type="range" id="range-amount" min="1" max="3" step="0.1" value="1.6" /></label>
+    <label>Saturation <input type="range" id="range-saturate" min="0.5" max="2" step="0.05" value="1.15" /></label>
+    <span class="status" id="status-text">status: off</span>
+  </div>
+
+  <section id="meet-call-area">
+    <div class="toolbar-mock">
+      <span class="meeting-code">meet.google.com/abc-defg-hij</span>
+      <span class="toolbar-icons">
+        <span>&#127908;</span>
+        <span>&#128249;</span>
+        <span class="end-call">&#9632;</span>
+      </span>
+    </div>
+    <div class="tiles-grid">
+      <div class="video-tile tile-1">Dana R.</div>
+      <div class="video-tile tile-2">Marcus O.</div>
+      <div class="video-tile tile-3">Priya S.</div>
+    </div>
+    <div class="caption-text">
+      <div class="block on-dark">
+        "Can you walk me through your experience with accessibility testing?" — live caption,
+        light text on dark chrome.
+      </div>
+      <div class="block on-light">
+        Interview notes panel: dark text on a light card, representative of Meet's
+        light-theme UI chrome.
+      </div>
+    </div>
+  </section>
+
+  <div id="log-wrap">
+    <h2>Console</h2>
+    <div id="log"></div>
+  </div>
+
+  <script src="../../utils/logger.js"></script>
+  <script src="../../utils/perf.js"></script>
+  <script>
+    // Minimal stub so contrast.js's `AA.filterRegistry?.register(...)` call
+    // is a no-op here — this page exercises contrast.js in isolation, not
+    // the full filter-registry.js lifecycle/fault-isolation wrapper.
+    window.AA = window.AA || {};
+    AA.filterRegistry = { register: function () {} };
+  </script>
+  <script src="../../content/filters/contrast.js"></script>
+  <script>
+    (function () {
+      const logEl = document.getElementById("log");
+
+      function appendLine(cls, args) {
+        const line = document.createElement("div");
+        line.className = "log-line " + cls;
+        line.textContent = Array.from(args)
+          .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+          .join(" ");
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      ["log", "info", "debug", "warn", "error"].forEach((level) => {
+        const original = console[level] ? console[level].bind(console) : null;
+        const cls = level === "warn" ? "log-warn" : level === "error" ? "log-error" : "";
+        console[level] = function (...args) {
+          if (original) original(...args);
+          appendLine(cls, args);
+        };
+      });
+
+      // Exercise the real ModuleContext shape (ARCHITECTURE.md §4), including
+      // a working ctx.meet.getVideoTiles() backed by the mock tile elements
+      // above, so contrast.js resolves #meet-call-area as its target root
+      // instead of only hitting the document.body fallback path.
+      const ctx = {
+        meet: {
+          getVideoTiles: () => Array.from(document.querySelectorAll(".video-tile")),
+          getScreenshareNode: () => null,
+          getTheme: () => "dark",
+          on: () => () => {},
+        },
+        storage: null,
+        logger: AA.logger.scope("showcase:contrast"),
+        reportError: (err) => console.error("[reportError]", err),
+      };
+      AA.filters.contrast.init(ctx);
+
+      const buttons = {
+        off: document.getElementById("btn-off"),
+        high: document.getElementById("btn-high"),
+        max: document.getElementById("btn-max"),
+        custom: document.getElementById("btn-custom"),
+      };
+      const statusText = document.getElementById("status-text");
+      const rangeAmount = document.getElementById("range-amount");
+      const rangeSaturate = document.getElementById("range-saturate");
+      let currentWhich = "off";
+
+      function setActive(which) {
+        currentWhich = which;
+        Object.values(buttons).forEach((b) => b.classList.remove("active"));
+        if (buttons[which]) buttons[which].classList.add("active");
+        statusText.textContent = "status: " + which;
+      }
+
+      buttons.off.addEventListener("click", () => {
+        AA.filters.contrast.disable();
+        setActive("off");
+      });
+      buttons.high.addEventListener("click", () => {
+        AA.filters.contrast.enable({ enabled: true, level: "high" });
+        setActive("high");
+      });
+      buttons.max.addEventListener("click", () => {
+        AA.filters.contrast.enable({ enabled: true, level: "max" });
+        setActive("max");
+      });
+      buttons.custom.addEventListener("click", () => {
+        AA.filters.contrast.enable({
+          enabled: true,
+          level: "custom",
+          amount: Number(rangeAmount.value),
+          saturate: Number(rangeSaturate.value),
+        });
+        setActive("custom");
+      });
+
+      // Live-adjust while "Custom" is active — no flicker, same as popup sliders.
+      [rangeAmount, rangeSaturate].forEach((input) => {
+        input.addEventListener("input", () => {
+          if (currentWhich !== "custom") return;
+          AA.filters.contrast.update({
+            enabled: true,
+            level: "custom",
+            amount: Number(rangeAmount.value),
+            saturate: Number(rangeSaturate.value),
+          });
+        });
+      });
+
+      setActive("off");
+      console.info("Contrast showcase ready.");
+    })();
+  </script>
+</body>
+</html>

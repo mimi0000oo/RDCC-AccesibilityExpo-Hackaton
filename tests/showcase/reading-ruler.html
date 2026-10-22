@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Dyslexia Reading Ruler — Showcase</title>
+<style>
+  :root {
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #121317;
+    color: #e8e8ea;
+  }
+  header {
+    padding: 20px 24px 8px;
+  }
+  header h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+  }
+  header p {
+    margin: 0;
+    color: #a3a3ab;
+    font-size: 13px;
+    max-width: 820px;
+    line-height: 1.5;
+  }
+  .controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding: 14px 24px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #26272e;
+    position: sticky;
+    top: 0;
+    background: #16171c;
+    z-index: 10;
+  }
+  .controls .field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #cfcfd6;
+  }
+  .controls input[type="range"] {
+    width: 160px;
+  }
+  .controls .field output {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: #8fb3ff;
+    min-width: 42px;
+    display: inline-block;
+  }
+  .controls button {
+    appearance: none;
+    border: 1px solid #3a3a42;
+    background: #1f1f26;
+    color: #e8e8ea;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .controls button:hover { background: #2a2a33; }
+  .controls button.active {
+    background: #4f7cff;
+    border-color: #4f7cff;
+    color: #fff;
+    font-weight: 600;
+  }
+  .controls .status {
+    font-size: 13px;
+    color: #a3a3ab;
+  }
+
+  main {
+    padding: 0 24px 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    max-width: 920px;
+  }
+
+  /* ---- Mock call UI: video tiles ---- */
+  .tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .video-tile {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+  .video-tile.tile-1 {
+    background: linear-gradient(135deg, #3a4a6b 0%, #1d2435 50%, #0f1320 100%);
+  }
+  .video-tile.tile-2 {
+    background: linear-gradient(135deg, #6b4a3a 0%, #35241d 50%, #20140f 100%);
+  }
+  .video-tile.tile-3 {
+    background: linear-gradient(135deg, #3a6b4a 0%, #1d3524 50%, #0f2014 100%);
+  }
+
+  /* ---- Reading content: interview-caption-style paragraphs ---- */
+  .reading-panel {
+    background: #1a1b20;
+    border: 1px solid #26272e;
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+  .reading-panel h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8c8c94;
+  }
+  .reading-panel p {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #d8d8dd;
+    margin: 0 0 16px;
+  }
+  .reading-panel p:last-child { margin-bottom: 0; }
+  .reading-panel p .speaker {
+    color: #8fb3ff;
+    font-weight: 600;
+  }
+
+  #log-wrap {
+    margin-top: 8px;
+  }
+  #log-wrap h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8c8c94;
+    margin: 0 0 6px;
+  }
+  #log {
+    background: #0b0c10;
+    border: 1px solid #26272e;
+    border-radius: 6px;
+    padding: 10px 12px;
+    height: 130px;
+    overflow-y: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b7c4d6;
+  }
+  #log .log-line { white-space: pre-wrap; }
+  #log .log-warn { color: #e0b84f; }
+  #log .log-error { color: #e06464; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Dyslexia Reading Ruler — Showcase</h1>
+    <p>
+      Standalone test harness for <code>content/overlays/reading-ruler.js</code>. Move the
+      mouse over the captions/chat text below — a translucent horizontal "window" band tracks
+      the cursor's vertical position, keeping the line under it clear while dimming everything
+      above and below, to help readers with dyslexia or visual-tracking difficulty keep their
+      place while reading captions, chat, or on-screen text during a call.
+    </p>
+  </header>
+
+  <div class="controls">
+    <div class="field">
+      <label for="height-slider">Height</label>
+      <input id="height-slider" type="range" min="24" max="120" step="1" value="56" />
+      <output id="height-value">56px</output>
+    </div>
+    <div class="field">
+      <label for="opacity-slider">Dim opacity</label>
+      <input id="opacity-slider" type="range" min="0.3" max="0.95" step="0.01" value="0.65" />
+      <output id="opacity-value">0.65</output>
+    </div>
+    <button id="btn-toggle" type="button">Enable</button>
+    <span class="status" id="status-text">status: off</span>
+  </div>
+
+  <main>
+    <div class="tiles-grid">
+      <div class="video-tile tile-1">Dana R.</div>
+      <div class="video-tile tile-2">Marcus O.</div>
+      <div class="video-tile tile-3">Priya S.</div>
+    </div>
+
+    <section class="reading-panel">
+      <h2>Live captions / interview transcript</h2>
+      <p><span class="speaker">Interviewer:</span> Thanks for joining today. Could you start by walking me through your background and what drew you to this role? We have about forty-five minutes, so feel free to take your time with the answer.</p>
+      <p><span class="speaker">Candidate:</span> Sure, happy to. I spent the last three years working on accessibility tooling for a mid-sized SaaS company, mostly focused on making data-heavy dashboards usable with screen readers and keyboard-only navigation. Before that I was on a general front-end team, but accessibility kept coming up as the thing nobody owned, so I ended up specializing in it.</p>
+      <p><span class="speaker">Interviewer:</span> That's a great segue into my next question. Can you describe a specific accessibility problem you solved that you're especially proud of, and walk me through how you diagnosed it, what options you considered, and why you picked the approach you shipped?</p>
+      <p><span class="speaker">Candidate:</span> One that stands out was a live-updating notifications panel that screen reader users couldn't reliably track, because new items were inserted without any ARIA live region, so updates were silent. I set up an `aria-live="polite"` region, throttled the announcements so it didn't become a firehose of noise, and added a visible focus ring that matched what the reader would hear, so sighted and non-sighted users got a consistent sense of "something just changed here."</p>
+      <p><span class="speaker">Interviewer:</span> Nice. Last one for this section — how do you usually test accessibility work before it ships? Automated tools only, manual pass, or something in between?</p>
+      <p><span class="speaker">Candidate:</span> Always a mix. Automated linting catches the obvious stuff — missing labels, contrast ratios, that kind of thing — but it misses anything about actual usability, so I always do a manual keyboard-only pass and at least a partial screen-reader pass with VoiceOver or NVDA before calling something done.</p>
+    </section>
+
+    <div id="log-wrap">
+      <h2>Console</h2>
+      <div id="log"></div>
+    </div>
+  </main>
+
+  <script src="../../utils/logger.js"></script>
+  <script src="../../utils/perf.js"></script>
+  <script>
+    // Minimal overlay-registry stub sufficient to drive reading-ruler.js's
+    // real public API directly, including its own onFrame loop — there is no
+    // full overlay-registry.js shared rAF loop present on this standalone
+    // page, so this stub runs one in its place and stops it on disable().
+    window.AA = window.AA || {};
+    AA.overlayRegistry = {
+      register: function (module) {
+        window.__readingRulerModule = module;
+      },
+      enable: function (id, opts) {
+        const m = window.__readingRulerModule;
+        if (!m) return;
+        if (!window.__readingRulerInited) {
+          m.init({
+            meet: null,
+            storage: null,
+            logger: AA.logger.scope("showcase:reading-ruler"),
+            reportError: (err) => console.error("[reportError]", err),
+          });
+          window.__readingRulerInited = true;
+        }
+        m.enable(opts);
+        window.__rulerRunning = true;
+        requestAnimationFrame(function loop(t) {
+          if (!window.__rulerRunning) return;
+          m.onFrame(t);
+          requestAnimationFrame(loop);
+        });
+      },
+      update: function (id, opts) {
+        window.__readingRulerModule && window.__readingRulerModule.update(opts);
+      },
+      disable: function () {
+        window.__rulerRunning = false;
+        window.__readingRulerModule && window.__readingRulerModule.disable();
+      },
+    };
+  </script>
+  <script src="../../content/overlays/reading-ruler.js"></script>
+  <script>
+    (function () {
+      const logEl = document.getElementById("log");
+
+      function appendLine(cls, args) {
+        const line = document.createElement("div");
+        line.className = "log-line " + cls;
+        line.textContent = Array.from(args)
+          .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+          .join(" ");
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      ["log", "info", "debug", "warn", "error"].forEach((level) => {
+        const original = console[level] ? console[level].bind(console) : null;
+        const cls = level === "warn" ? "log-warn" : level === "error" ? "log-error" : "";
+        console[level] = function (...args) {
+          if (original) original(...args);
+          appendLine(cls, args);
+        };
+      });
+
+      const heightSlider = document.getElementById("height-slider");
+      const heightValue = document.getElementById("height-value");
+      const opacitySlider = document.getElementById("opacity-slider");
+      const opacityValue = document.getElementById("opacity-value");
+      const toggleBtn = document.getElementById("btn-toggle");
+      const statusText = document.getElementById("status-text");
+
+      let enabled = false;
+
+      function currentOptions() {
+        return {
+          enabled: enabled,
+          height: Number(heightSlider.value),
+          opacity: Number(opacitySlider.value),
+        };
+      }
+
+      function setStatus(on) {
+        enabled = on;
+        toggleBtn.textContent = on ? "Disable" : "Enable";
+        toggleBtn.classList.toggle("active", on);
+        statusText.textContent = "status: " + (on ? "on" : "off");
+      }
+
+      heightSlider.addEventListener("input", () => {
+        heightValue.textContent = heightSlider.value + "px";
+        if (enabled) AA.overlayRegistry.update("readingRuler", currentOptions());
+      });
+
+      opacitySlider.addEventListener("input", () => {
+        opacityValue.textContent = Number(opacitySlider.value).toFixed(2);
+        if (enabled) AA.overlayRegistry.update("readingRuler", currentOptions());
+      });
+
+      toggleBtn.addEventListener("click", () => {
+        if (!enabled) {
+          setStatus(true);
+          AA.overlayRegistry.enable("readingRuler", currentOptions());
+        } else {
+          setStatus(false);
+          AA.overlayRegistry.disable("readingRuler");
+        }
+      });
+
+      heightValue.textContent = heightSlider.value + "px";
+      opacityValue.textContent = Number(opacitySlider.value).toFixed(2);
+      console.info("Reading ruler showcase ready. Click Enable, then move the mouse over the transcript text.");
+    })();
+  </script>
+</body>
+</html>

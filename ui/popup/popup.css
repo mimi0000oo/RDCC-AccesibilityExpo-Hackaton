@@ -1,0 +1,391 @@
+/*
+ * ui/popup/popup.css
+ * Wave 5 popup styling. No remote fonts/assets (ARCHITECTURE.md §8) — system
+ * font stack only. Visual design favors the same users the extension serves:
+ * AA-contrast text, visible focus rings, large-enough hit targets.
+ */
+
+:root,
+:root[data-theme="light"] {
+  --aa-bg: #ffffff;
+  --aa-surface: #ffffff;
+  --aa-surface-alt: #f8f9fa;
+  --aa-fg: #1f1f1f;
+  --aa-muted: #5f6368;
+  --aa-border: #dadce0;
+  --aa-accent: #1a73e8;
+  --aa-danger: #d93025;
+  --aa-danger-bg: #fce8e6;
+  --aa-warn-bg: #fef7e0;
+  --aa-warn-fg: #594400;
+}
+
+/* Set explicitly by popup.js's theme toggle (light/dark only, persisted in
+   ui.theme) — no prefers-color-scheme tracking, the user picks directly. */
+:root[data-theme="dark"] {
+  --aa-bg: #1f1f1f;
+  --aa-surface: #2a2a2e;
+  --aa-surface-alt: #26272b;
+  --aa-fg: #e8eaed;
+  --aa-muted: #9aa0a6;
+  --aa-border: #3c4043;
+  --aa-accent: #8ab4f8;
+  --aa-danger: #f28b82;
+  --aa-danger-bg: #3c1414;
+  --aa-warn-bg: #3f3418;
+  --aa-warn-fg: #f2d78c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* The toolbar-icon action popup (manifest.json default_popup) — a dropdown
+   overlaying whatever tab is active (the Meet call itself), not a separate
+   tab, so toggling a module and watching it apply live both happen on the
+   SAME tab. Chrome auto-fits the actual popup WINDOW to document.body's
+   size up to its own hard cap (~800x600) — width/max-height below sit right
+   at that cap, as large as a dropdown popup can get. */
+body {
+  margin: 0;
+  width: 800px;
+  max-height: 600px;
+  overflow-y: auto;
+  font: 13px/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--aa-bg);
+  color: var(--aa-fg);
+}
+
+.aa-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+header {
+  padding: 10px 24px 8px;
+  border-bottom: 1px solid var(--aa-border);
+}
+
+.aa-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.aa-header-buttons {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.aa-theme-btn,
+.aa-reset-btn {
+  flex: none;
+  font: 700 13px inherit;
+  padding: 8px 14px;
+  border: 2px solid var(--aa-border);
+  border-radius: 6px;
+  background: var(--aa-surface);
+  color: var(--aa-fg);
+  cursor: pointer;
+}
+
+.aa-theme-btn:hover {
+  background: var(--aa-surface-alt);
+  border-color: var(--aa-accent);
+  color: var(--aa-accent);
+}
+
+.aa-reset-btn:hover {
+  background: var(--aa-danger-bg);
+  border-color: var(--aa-danger);
+  color: var(--aa-danger);
+}
+
+#aa-offsite-notice {
+  margin: 8px 24px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--aa-warn-bg);
+  color: var(--aa-warn-fg);
+  font-size: 12px;
+}
+
+.aa-conditions-section {
+  padding: 10px 24px 12px;
+  border-bottom: 1px solid var(--aa-border);
+  background: var(--aa-surface-alt);
+}
+
+.aa-conditions-section h2 {
+  margin: 0 0 3px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.aa-conditions-section > .aa-hint {
+  margin-bottom: 6px;
+}
+
+.aa-condition-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.aa-condition-btn {
+  display: inline-block;
+  padding: 10px 18px;
+  font: 700 15px inherit;
+  border: 2px solid var(--aa-accent);
+  border-radius: 999px;
+  background: var(--aa-surface);
+  color: var(--aa-accent);
+  cursor: pointer;
+}
+
+.aa-condition-btn:hover {
+  background: var(--aa-accent);
+  color: var(--aa-bg);
+}
+
+.aa-condition-btn:focus-visible {
+  outline: 3px solid var(--aa-accent);
+  outline-offset: 2px;
+}
+
+.aa-condition-btn-active {
+  background: var(--aa-accent);
+  color: var(--aa-bg);
+  box-shadow: 0 0 0 2px var(--aa-accent);
+}
+
+/* Shared area below the FULL row of category pills — each expanded
+   category renders its own titled card here, stacked, instead of inline
+   next to its pill (which pushed the flex-wrap row around awkwardly). */
+.aa-condition-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.aa-condition-panel-wrap {
+  border: 2px solid var(--aa-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--aa-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.aa-condition-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--aa-accent);
+  color: var(--aa-bg);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.aa-condition-panel-close {
+  flex: none;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.aa-condition-panel-close:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.aa-condition-panel-close:focus-visible {
+  outline: 2px solid var(--aa-bg);
+  outline-offset: 1px;
+}
+
+.aa-condition-panel {
+  background: var(--aa-surface);
+}
+
+.aa-condition-panel .aa-module {
+  padding: 6px 10px;
+}
+
+.aa-condition-unavailable {
+  margin: 8px 10px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--aa-muted);
+}
+
+.aa-module {
+  padding: 14px 24px;
+}
+
+.aa-module-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.aa-module-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.aa-badge-error {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--aa-danger);
+  background: var(--aa-danger-bg);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.aa-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex: none;
+}
+
+.aa-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.aa-switch .aa-track {
+  position: absolute;
+  inset: 0;
+  background: #c4c7c5;
+  border-radius: 999px;
+  transition: background 0.12s ease;
+}
+
+.aa-switch .aa-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.12s ease;
+}
+
+.aa-switch input:checked + .aa-track {
+  background: var(--aa-accent);
+}
+
+.aa-switch input:checked + .aa-track .aa-thumb {
+  transform: translateX(18px);
+}
+
+.aa-switch input:focus-visible + .aa-track {
+  outline: 2px solid var(--aa-accent);
+  outline-offset: 2px;
+}
+
+.aa-module-options {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aa-module[data-enabled="false"] .aa-module-options {
+  display: none;
+}
+
+.aa-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--aa-muted);
+}
+
+.aa-option-row select {
+  font: inherit;
+  padding: 2px 4px;
+}
+
+.aa-option-row input[type="range"] {
+  width: 160px;
+  max-width: 100%;
+}
+
+.aa-option-row input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--aa-accent);
+  outline-offset: 1px;
+}
+
+.aa-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--aa-muted);
+}
+
+/* Narrow windows (a resized tab, a split-screen pane, a small display) —
+   trade the generous full-screen padding for density instead of the
+   content getting visually lost in excess whitespace. */
+@media (max-width: 560px) {
+  header,
+  .aa-conditions-section {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  #aa-offsite-notice {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+
+  .aa-module {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .aa-header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

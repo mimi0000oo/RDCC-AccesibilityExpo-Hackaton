@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Screen Magnifier — Showcase</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #121317;
+    color: #e8e8ea;
+  }
+  header { padding: 20px 24px 8px; }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; color: #a3a3ab; font-size: 13px; max-width: 760px; line-height: 1.5; }
+  header code {
+    background: #1f1f26;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    padding: 14px 24px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #22232a;
+  }
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #cfcfd6;
+  }
+  .control-group label { white-space: nowrap; }
+  input[type="range"] { width: 160px; }
+  select {
+    background: #1f1f26;
+    color: #e8e8ea;
+    border: 1px solid #3a3a42;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+  button {
+    appearance: none;
+    border: 1px solid #3a3a42;
+    background: #1f1f26;
+    color: #e8e8ea;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:hover { background: #2a2a33; }
+  button.active {
+    background: #4f7cff;
+    border-color: #4f7cff;
+    color: #fff;
+    font-weight: 600;
+  }
+  .status { margin-left: 4px; font-size: 13px; color: #a3a3ab; }
+  .zoom-readout { font-variant-numeric: tabular-nums; color: #e8e8ea; min-width: 34px; display: inline-block; }
+
+  /* ---- Mock Google Meet call area ---- */
+  #meet-call-area {
+    margin: 16px 24px 0;
+    border: 1px solid #2a2a32;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0b0c10;
+  }
+  .toolbar-mock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #1a1b20;
+    border-bottom: 1px solid #26272e;
+    font-size: 13px;
+  }
+  .toolbar-mock .meeting-code { color: #cfcfd6; letter-spacing: 0.5px; }
+  .toolbar-mock .toolbar-icons { display: flex; gap: 10px; }
+  .toolbar-mock .toolbar-icons span {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2e2f38;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .toolbar-mock .toolbar-icons span.end-call { background: #c23b3b; }
+
+  .tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 14px;
+  }
+  .tile {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    display: flex;
+    align-items: flex-end;
+  }
+  .tile video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .tile .tile-name {
+    position: relative;
+    z-index: 1;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+
+  .text-panel {
+    padding: 12px 16px 18px;
+    display: grid;
+    gap: 10px;
+  }
+  .text-panel .block {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .text-panel .block.on-dark { background: #15161b; color: #cfcfd6; }
+  .text-panel .block.on-light { background: #e9e9ee; color: #2a2a32; }
+  .text-panel .fine-print {
+    font-size: 10px;
+    color: #6b6b73;
+    letter-spacing: 0.02em;
+  }
+
+  .hint {
+    margin: 10px 24px 0;
+    font-size: 12px;
+    color: #7a7a82;
+  }
+
+  #log-wrap { margin: 20px 24px 24px; }
+  #log-wrap h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8c8c94;
+    margin: 0 0 6px;
+  }
+  #log {
+    background: #0b0c10;
+    border: 1px solid #26272e;
+    border-radius: 6px;
+    padding: 10px 12px;
+    height: 140px;
+    overflow-y: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b7c4d6;
+  }
+  #log .log-line { white-space: pre-wrap; }
+  #log .log-warn { color: #e0b84f; }
+  #log .log-error { color: #e06464; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Screen Magnifier — Showcase</h1>
+    <p>
+      Standalone test harness for <code>content/overlays/magnifier.js</code>. Move the mouse
+      over the mock call area below — a cursor-follow lens magnifies whatever is underneath it.
+      The lens is built entirely from <code>cloneNode(true)</code> + CSS <code>transform</code>;
+      it never reads video pixels, draws to a canvas, or calls
+      <code>getDisplayMedia</code> (ARCHITECTURE.md &sect;8). Each tile's live
+      <code>canvas.captureStream()</code> video is mirrored into the lens by copying the
+      <code>&lt;video&gt;</code> element's <code>srcObject</code> reference onto its clone.
+    </p>
+  </header>
+
+  <div class="controls">
+    <div class="control-group">
+      <button id="btn-toggle" type="button">Enable</button>
+      <span class="status" id="status-text">status: off</span>
+    </div>
+    <div class="control-group">
+      <label for="zoom-slider">Zoom</label>
+      <input id="zoom-slider" type="range" min="1.5" max="4" step="0.1" value="2" />
+      <span class="zoom-readout" id="zoom-readout">2.0x</span>
+    </div>
+    <div class="control-group">
+      <label for="shape-select">Shape</label>
+      <select id="shape-select">
+        <option value="circle">Circle</option>
+        <option value="rect">Rectangle</option>
+      </select>
+    </div>
+  </div>
+
+  <section id="meet-call-area">
+    <div class="toolbar-mock">
+      <span class="meeting-code">meet.google.com/abc-defg-hij</span>
+      <span class="toolbar-icons">
+        <span>&#127908;</span>
+        <span>&#128249;</span>
+        <span class="end-call">&#9632;</span>
+      </span>
+    </div>
+    <div class="tiles-grid">
+      <div class="tile" id="tile-1">
+        <video autoplay muted playsinline></video>
+        <span class="tile-name">Dana R.</span>
+      </div>
+      <div class="tile" id="tile-2">
+        <video autoplay muted playsinline></video>
+        <span class="tile-name">Marcus O.</span>
+      </div>
+      <div class="tile" id="tile-3">
+        <video autoplay muted playsinline></video>
+        <span class="tile-name">Priya S.</span>
+      </div>
+    </div>
+    <div class="text-panel">
+      <div class="block on-dark">
+        "Can you walk me through your experience with accessibility testing?" — live caption
+        text, small font, to make magnified legibility obvious.
+      </div>
+      <div class="block on-light">
+        Interview notes panel: dark text on a light card, representative of Meet's light-theme UI
+        chrome. <span class="fine-print">Fine print: schemaVersion 1, zoom 1.5&ndash;4x, shape circle|rect.</span>
+      </div>
+    </div>
+  </section>
+
+  <p class="hint">
+    Tip: the tiles above are driven by <code>canvas.captureStream()</code> — genuine animating
+    live video, not a static image — so you can confirm the lens shows a moving, in-sync copy of
+    the stream rather than a frozen screenshot.
+  </p>
+
+  <div id="log-wrap">
+    <h2>Console</h2>
+    <div id="log"></div>
+  </div>
+
+  <script src="../../utils/logger.js"></script>
+  <script src="../../utils/perf.js"></script>
+  <script>
+    // Minimal overlay-registry stub sufficient to drive magnifier.js directly
+    // in isolation (this page exercises the module, not the full registry's
+    // fault-isolation wrapper or its shared rAF scheduler).
+    window.AA = window.AA || {};
+    AA.overlayRegistry = {
+      register: function (mod) {
+        window.__mod = mod;
+      },
+      enable: function (id, opts) {
+        if (!window.__mod) return;
+        window.__mod.init({
+          logger: AA.logger.scope("showcase:magnifier"),
+          meet: {
+            getVideoTiles: function () {
+              return Array.from(document.querySelectorAll(".tile video"));
+            },
+            getScreenshareNode: function () {
+              return null;
+            },
+            getTheme: function () {
+              return "dark";
+            },
+            on: function () {
+              return function () {};
+            },
+          },
+          storage: null,
+          reportError: function (err) {
+            console.error("[reportError]", err);
+          },
+        });
+        window.__mod.enable(opts);
+        window.__running = true;
+        (function loop(t) {
+          if (window.__running) {
+            window.__mod.onFrame(t);
+            requestAnimationFrame(loop);
+          }
+        })(performance.now());
+      },
+      update: function (id, opts) {
+        if (window.__mod) window.__mod.update(opts);
+      },
+      disable: function () {
+        window.__running = false;
+        if (window.__mod) window.__mod.disable();
+      },
+      destroy: function () {
+        window.__running = false;
+        if (window.__mod) window.__mod.destroy();
+      },
+    };
+  </script>
+  <script src="../../content/overlays/magnifier.js"></script>
+  <script>
+    (function () {
+      const logEl = document.getElementById("log");
+
+      function appendLine(cls, args) {
+        const line = document.createElement("div");
+        line.className = "log-line " + cls;
+        line.textContent = Array.from(args)
+          .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+          .join(" ");
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      ["log", "info", "debug", "warn", "error"].forEach((level) => {
+        const original = console[level] ? console[level].bind(console) : null;
+        const cls = level === "warn" ? "log-warn" : level === "error" ? "log-error" : "";
+        console[level] = function (...args) {
+          if (original) original(...args);
+          appendLine(cls, args);
+        };
+      });
+
+      // --- Drive each tile's <video> with a genuinely live, animating
+      // MediaStream via canvas.captureStream(), so the magnifier has real
+      // moving content to mirror instead of a static image. ---
+      function startLiveTile(videoEl, hue) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 320;
+        canvas.height = 200;
+        const g = canvas.getContext("2d");
+        let t = 0;
+
+        function draw() {
+          t += 1;
+          const grad = g.createLinearGradient(0, 0, canvas.width, canvas.height);
+          const h1 = (hue + t) % 360;
+          const h2 = (hue + 140 + t) % 360;
+          grad.addColorStop(0, `hsl(${h1}, 55%, 28%)`);
+          grad.addColorStop(1, `hsl(${h2}, 55%, 14%)`);
+          g.fillStyle = grad;
+          g.fillRect(0, 0, canvas.width, canvas.height);
+
+          // A moving "speaker waveform"-style shape so motion is obvious.
+          g.strokeStyle = "rgba(255,255,255,0.75)";
+          g.lineWidth = 3;
+          g.beginPath();
+          for (let x = 0; x <= canvas.width; x += 4) {
+            const y =
+              canvas.height / 2 +
+              Math.sin((x + t * 4) * 0.04) * 24 +
+              Math.sin((x + t * 2) * 0.01) * 10;
+            if (x === 0) g.moveTo(x, y);
+            else g.lineTo(x, y);
+          }
+          g.stroke();
+
+          // Sharp text baked into the canvas too, to see text magnification.
+          g.font = "bold 16px -apple-system, Arial, sans-serif";
+          g.fillStyle = "#ffffff";
+          g.fillText("LIVE", 10, 24);
+        }
+
+        draw();
+        const intervalHandle = setInterval(draw, 66); // ~15fps canvas updates
+
+        const stream = canvas.captureStream(15);
+        videoEl.srcObject = stream;
+        videoEl.play().catch(() => {});
+
+        return function stop() {
+          clearInterval(intervalHandle);
+          try {
+            stream.getTracks().forEach((tr) => tr.stop());
+          } catch (_) {
+            /* ignore */
+          }
+        };
+      }
+
+      const tileVideos = Array.from(document.querySelectorAll(".tile video"));
+      const hues = [210, 20, 130];
+      tileVideos.forEach((v, i) => startLiveTile(v, hues[i % hues.length]));
+
+      // --- Wire the real controls to the real module via the registry stub ---
+      const toggleBtn = document.getElementById("btn-toggle");
+      const statusText = document.getElementById("status-text");
+      const zoomSlider = document.getElementById("zoom-slider");
+      const zoomReadout = document.getElementById("zoom-readout");
+      const shapeSelect = document.getElementById("shape-select");
+
+      let enabled = false;
+
+      function currentOptions() {
+        return {
+          enabled: true,
+          zoom: parseFloat(zoomSlider.value),
+          shape: shapeSelect.value,
+        };
+      }
+
+      function setStatus(on) {
+        enabled = on;
+        toggleBtn.textContent = on ? "Disable" : "Enable";
+        toggleBtn.classList.toggle("active", on);
+        statusText.textContent = "status: " + (on ? "on" : "off");
+      }
+
+      toggleBtn.addEventListener("click", () => {
+        if (!enabled) {
+          AA.overlayRegistry.enable("magnifier", currentOptions());
+          setStatus(true);
+        } else {
+          AA.overlayRegistry.disable("magnifier");
+          setStatus(false);
+        }
+      });
+
+      zoomSlider.addEventListener("input", () => {
+        const z = parseFloat(zoomSlider.value);
+        zoomReadout.textContent = z.toFixed(1) + "x";
+        if (enabled) AA.overlayRegistry.update("magnifier", { zoom: z });
+      });
+
+      shapeSelect.addEventListener("change", () => {
+        if (enabled) AA.overlayRegistry.update("magnifier", { shape: shapeSelect.value });
+      });
+
+      setStatus(false);
+      zoomReadout.textContent = parseFloat(zoomSlider.value).toFixed(1) + "x";
+      console.info("Magnifier showcase ready.");
+    })();
+  </script>
+</body>
+</html>

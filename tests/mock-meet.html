@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mock Google Meet — MeetAssist Verification Harness</title>
+<style>
+  :root { --bg: #202124; --fg: #e8eaed; --accent: #1a73e8; }
+  body.theme-light { --bg: #ffffff; --fg: #202124; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Google Sans", Arial, sans-serif; background: var(--bg); color: var(--fg); height: 100vh; display: flex; flex-direction: column; }
+  #call-area { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; padding: 16px; align-content: start; }
+  .tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+  .tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile .label { position: absolute; bottom: 6px; left: 8px; font-size: 12px; background: rgba(0,0,0,.5); padding: 2px 8px; border-radius: 4px; }
+  .tile.screenshare { grid-column: 1 / -1; aspect-ratio: 16/9; max-width: 100%; }
+  #toolbar { height: 64px; background: #000; display: flex; align-items: center; justify-content: center; gap: 16px; }
+  #toolbar button { width: 44px; height: 44px; border-radius: 50%; border: none; background: #3c4043; color: #fff; cursor: pointer; }
+  #test-panel { position: fixed; top: 0; right: 0; width: 320px; max-height: 100vh; overflow-y: auto; background: #fff; color: #111; padding: 12px; font-family: monospace; font-size: 12px; z-index: 99999; border-left: 2px solid var(--accent); }
+  #test-panel h3 { margin: 12px 0 4px; }
+  #test-panel button { display: inline-block; margin: 2px; padding: 4px 8px; cursor: pointer; }
+  #log { background: #111; color: #0f0; padding: 8px; max-height: 160px; overflow-y: auto; white-space: pre-wrap; }
+</style>
+<!-- Main-world content script (manifest.json "world": "MAIN", document_start):
+     loaded before everything else, as in real Meet. -->
+<script src="../content/main-world/media-guard.js"></script>
+</head>
+<body>
+  <div id="call-area"></div>
+  <div id="toolbar">
+    <button id="toggle-theme" title="Toggle theme">🌓</button>
+    <button id="toggle-screenshare" title="Toggle screenshare">🖥️</button>
+    <button id="add-tile" title="Add participant">➕</button>
+    <!-- Romanian aria-labels on purpose — exercises custom-hotkeys.js's
+         diacritic-stripping + locale-independent data-is-muted fallback,
+         the same way a non-English Meet UI would. -->
+    <button id="mock-mic-btn" aria-label="Dezactivează microfonul" data-is-muted="false">🎤</button>
+    <button id="mock-camera-btn" aria-label="Dezactivează camera">📷</button>
+    <!-- Formal conjugation ("Părăsiți", not "Părăsește") on purpose — the
+         real-world mismatch custom-hotkeys.js's stem-matching fix targets. -->
+    <button id="mock-hangup-btn" aria-label="Părăsiți apelul">📞</button>
+    <!-- Mock Meet's own captions toggle, for live-captions.js's
+         ensureMeetCaptionsOn()/ensureMeetCaptionsOff(). -->
+    <button id="mock-captions-toggle-btn" aria-label="Activează subtitrarea" data-captions-on="false">CC</button>
+  </div>
+  <!-- Mock Meet's own caption container, for ai-recap.js's own scraping
+       (independent of live-captions.js — see its file header). -->
+  <div class="a4cQT" id="mock-caption-container" style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);color:#fff;font-size:12px;" aria-live="polite"></div>
+
+  <div id="test-panel">
+    <strong>MeetAssist — Verification Panel</strong>
+    <div id="panel-body">Waiting for modules to load&hellip;</div>
+    <h3>Console</h3>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // --- Mock Meet DOM builder --------------------------------------------
+    const callArea = document.getElementById("call-area");
+    let tileCount = 0;
+
+    // Shared oscillator-driving AudioContext for mock tiles' synthetic
+    // audio tracks (separate from focus-mode.js's own AudioContext, which
+    // it uses to ANALYZE these same tiles — browsers allow multiple
+    // AudioContexts on one page).
+    const mockAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    window.__aaTileGains = {}; // label -> GainNode, so tests can set who's "loudest"
+
+    function makeFakeTile(width, height, label, hueA, hueB, screenshare, isSelfView) {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const g = canvas.getContext("2d");
+      let hue = hueA;
+
+      function draw() {
+        const grad = g.createLinearGradient(0, 0, width, height);
+        grad.addColorStop(0, `hsl(${hue}, 70%, 45%)`);
+        grad.addColorStop(1, `hsl(${hueB}, 70%, 30%)`);
+        g.fillStyle = grad;
+        g.fillRect(0, 0, width, height);
+        g.fillStyle = "#fff";
+        g.font = "bold 28px sans-serif";
+        g.fillText(label, 20, 40);
+        hue = (hue + 1) % 360;
+      }
+      draw();
+      const canvasStream = canvas.captureStream(15);
+      const timer = setInterval(draw, 200);
+
+      // Silent-by-default synthetic audio track (gain 0) so focus-mode.js's
+      // AnalyserNode has something to read per tile — tests ramp a
+      // specific tile's gain up to simulate "who's speaking".
+      const oscillator = mockAudioCtx.createOscillator();
+      oscillator.frequency.value = 220;
+      const gainNode = mockAudioCtx.createGain();
+      gainNode.gain.value = 0;
+      const destination = mockAudioCtx.createMediaStreamDestination();
+      oscillator.connect(gainNode).connect(destination);
+      oscillator.start();
+      window.__aaTileGains[label] = gainNode;
+
+      const stream = new MediaStream([...canvasStream.getVideoTracks(), ...destination.stream.getAudioTracks()]);
+
+      const tile = document.createElement("div");
+      tile.className = "tile" + (screenshare ? " screenshare" : "");
+      tile.dataset.timer = String(timer);
+
+      const video = document.createElement("video");
+      video.autoplay = true;
+      // Mirrors real Meet: only the LOCAL self-view tile is muted (to avoid
+      // echo) — remote tiles are NOT, since you need to hear them. This
+      // matters for focus-mode.js's audio analysis: a MediaStream-sourced
+      // (not file-sourced) <video> that IS muted reads as silent through a
+      // Web Audio AnalyserNode in Chrome (confirmed empirically — unlike a
+      // pre-recorded file, muting at the element level zeroes the tapped
+      // samples too, not just the speaker output).
+      video.muted = !!isSelfView;
+      video.playsInline = true;
+      video.srcObject = stream;
+      tile.appendChild(video);
+
+      const labelEl = document.createElement("div");
+      labelEl.className = "label";
+      labelEl.textContent = isSelfView ? `${label} (You)` : label;
+      tile.appendChild(labelEl);
+
+      return tile;
+    }
+
+    function addParticipantTile() {
+      tileCount += 1;
+      const tile = makeFakeTile(
+        320,
+        180,
+        `Participant ${tileCount}`,
+        (tileCount * 47) % 360,
+        (tileCount * 47 + 60) % 360,
+        false,
+        tileCount === 1 // first seeded tile plays the role of "your own" tile
+      );
+      callArea.appendChild(tile);
+      return tile;
+    }
+
+    // Simulates Meet dropping a floating emoji reaction over the grid, for
+    // focus-mode.js's hideReactions MutationObserver.
+    window.__aaAddMockReaction = (emoji) => {
+      const el = document.createElement("div");
+      el.className = "mock-reaction";
+      el.textContent = emoji || "👍";
+      el.style.cssText = "position:absolute;top:8px;right:8px;font-size:24px;";
+      callArea.appendChild(el);
+      return el;
+    };
+
+    // Simulates Meet streaming a caption line, then finalizing it (Meet
+    // clears/replaces the container's text per spoken line rather than
+    // emitting a discrete "final" event) — for ai-recap.js's own scraper.
+    window.__aaSetMockCaption = (text) => {
+      document.getElementById("mock-caption-container").textContent = text;
+    };
+
+    window.AA = window.AA || {};
+
+    let screenshareTile = null;
+    function toggleScreenshare() {
+      if (screenshareTile) {
+        clearInterval(Number(screenshareTile.dataset.timer));
+        screenshareTile.remove();
+        screenshareTile = null;
+      } else {
+        screenshareTile = makeFakeTile(1280, 720, "Screen share — Slide deck", 200, 220, true);
+        callArea.insertBefore(screenshareTile, callArea.firstChild);
+      }
+    }
+
+    document.getElementById("add-tile").addEventListener("click", addParticipantTile);
+    document.getElementById("toggle-screenshare").addEventListener("click", toggleScreenshare);
+    document.getElementById("toggle-theme").addEventListener("click", () => document.body.classList.toggle("theme-light"));
+
+    // --- Mock call-control buttons, for custom-hotkeys.js verification -----
+    window.__aaTestClicks = { mic: 0, camera: 0, hangup: 0 };
+    document.getElementById("mock-mic-btn").addEventListener("click", () => {
+      window.__aaTestClicks.mic += 1;
+    });
+    document.getElementById("mock-camera-btn").addEventListener("click", () => {
+      window.__aaTestClicks.camera += 1;
+    });
+    document.getElementById("mock-hangup-btn").addEventListener("click", () => {
+      window.__aaTestClicks.hangup += 1;
+    });
+
+    // --- Mock Meet captions toggle + container, for live-captions.js -------
+    const captionsToggleBtn = document.getElementById("mock-captions-toggle-btn");
+    window.__aaTestClicks.captionsToggle = 0;
+    captionsToggleBtn.addEventListener("click", () => {
+      window.__aaTestClicks.captionsToggle += 1;
+      const on = captionsToggleBtn.dataset.captionsOn === "true";
+      captionsToggleBtn.dataset.captionsOn = String(!on);
+      captionsToggleBtn.setAttribute("aria-label", on ? "Activează subtitrarea" : "Dezactivează subtitrarea");
+    });
+    // Seed with 3 participants so meet-observer has tiles on load.
+    addParticipantTile();
+    addParticipantTile();
+    addParticipantTile();
+
+    // --- On-page console mirror (so headless runs capture errors visually) --
+    const logEl = document.getElementById("log");
+    ["log", "info", "warn", "error"].forEach((level) => {
+      const original = console[level];
+      console[level] = function (...args) {
+        original.apply(console, args);
+        const line = document.createElement("div");
+        line.textContent = `[${level}] ` + args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+        if (level === "error") line.style.color = "#f66";
+        if (level === "warn") line.style.color = "#fc0";
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      };
+    });
+  </script>
+
+  <!--
+    Content-script injection order below MUST mirror manifest.json's
+    content_scripts.js array exactly. This harness loads them as classic
+    scripts via file:// or http://, same global-scope semantics as a real
+    Chrome content script, so the modules under test are the real production
+    files, unmodified. Scripts are added incrementally as each build wave
+    lands — see docs/STATUS.json for current wave coverage.
+  -->
+  <script src="../utils/logger.js"></script>
+  <script src="../utils/perf.js"></script>
+  <script src="../utils/storage.js"></script>
+  <script src="../utils/messaging.js"></script>
+  <script src="../utils/invite-link.js"></script>
+  <script src="../utils/floating-dock.js"></script>
+  <script src="../content/dom/meet-observer.js"></script>
+  <script src="../content/filters/filter-registry.js"></script>
+  <script src="../content/filters/contrast.js"></script>
+  <script src="../content/filters/colorblind.js"></script>
+  <script src="../content/filters/inversion.js"></script>
+  <script src="../content/overlays/overlay-registry.js"></script>
+  <script src="../content/overlays/reading-ruler.js"></script>
+  <script src="../content/overlays/magnifier.js"></script>
+  <script src="../content/overlays/pause-videos.js"></script>
+  <script src="../content/overlays/focus-mode.js"></script>
+  <script src="../content/overlays/custom-hotkeys.js"></script>
+  <script src="../content/overlays/live-captions.js"></script>
+  <script src="../content/overlays/ai-recap.js"></script>
+
+  <script>
+    // --- Verification panel: builds buttons from whatever actually registered ---
+    window.addEventListener("load", () => {
+      const panel = document.getElementById("panel-body");
+      panel.innerHTML = "";
+
+      function section(title) {
+        const h = document.createElement("h3");
+        h.textContent = title;
+        panel.appendChild(h);
+      }
+      function btn(text, fn) {
+        const b = document.createElement("button");
+        b.textContent = text;
+        b.addEventListener("click", fn);
+        panel.appendChild(b);
+      }
+
+      try {
+        const AA = window.AA || {};
+        if (AA.meetObserver) {
+          AA.meetObserver.start();
+          section("meet-observer");
+          btn("log surface", () => {
+            console.info("tiles:", AA.meetObserver.surface.getVideoTiles().length,
+              "screenshare:", !!AA.meetObserver.surface.getScreenshareNode(),
+              "theme:", AA.meetObserver.surface.getTheme());
+          });
+        }
+
+        const ctx = { meet: AA.meetObserver ? AA.meetObserver.surface : null, storage: AA.storage, logger: AA.logger.scope("ctx"), reportError: (e) => console.error("reportError", e) };
+
+        if (AA.filterRegistry) {
+          AA.filterRegistry.initAll(ctx);
+          section("filters");
+          btn("contrast: high", () => AA.filterRegistry.enable("contrast", { enabled: true, level: "high" }));
+          btn("contrast: max", () => AA.filterRegistry.enable("contrast", { enabled: true, level: "max" }));
+          btn("contrast: off", () => AA.filterRegistry.disable("contrast"));
+          btn("colorblind: protanopia", () => AA.filterRegistry.enable("colorblind", { enabled: true, mode: "protanopia" }));
+          btn("colorblind: deuteranopia", () => AA.filterRegistry.enable("colorblind", { enabled: true, mode: "deuteranopia" }));
+          btn("colorblind: tritanopia", () => AA.filterRegistry.enable("colorblind", { enabled: true, mode: "tritanopia" }));
+          btn("colorblind: off", () => AA.filterRegistry.disable("colorblind"));
+          btn("inversion: smart", () => AA.filterRegistry.enable("inversion", { enabled: true, smart: true }));
+          btn("inversion: full", () => AA.filterRegistry.enable("inversion", { enabled: true, smart: false }));
+          btn("inversion: off", () => AA.filterRegistry.disable("inversion"));
+          btn("status", () => console.info("filter status:", JSON.stringify(AA.filterRegistry.getStatus())));
+        }
+
+        if (AA.overlayRegistry) {
+          AA.overlayRegistry.initAll(ctx);
+          section("overlays");
+          btn("ruler: on", () => AA.overlayRegistry.enable("readingRuler", { enabled: true, height: 48, opacity: 0.85 }));
+          btn("ruler: off", () => AA.overlayRegistry.disable("readingRuler"));
+          btn("magnifier: on", () => AA.overlayRegistry.enable("magnifier", { enabled: true, zoom: 2, shape: "circle" }));
+          btn("magnifier: off", () => AA.overlayRegistry.disable("magnifier"));
+          btn("pause videos button: on", () => AA.overlayRegistry.enable("pauseVideos", { enabled: true }));
+          btn("click pause videos button", () => document.getElementById("aa-pause-videos-button")?.click());
+          btn("pause videos button: off", () => AA.overlayRegistry.disable("pauseVideos"));
+          btn("focus mode: dim others on", () =>
+            AA.overlayRegistry.enable("focusMode", { enabled: true, dimOthers: true })
+          );
+          btn("focus mode: hide self-view on", () =>
+            AA.overlayRegistry.update("focusMode", { enabled: true, hideSelfView: true })
+          );
+          btn("focus mode: hide reactions on", () =>
+            AA.overlayRegistry.update("focusMode", { enabled: true, hideReactions: true })
+          );
+          btn("focus mode: off", () => AA.overlayRegistry.disable("focusMode"));
+          btn("add mock reaction", () => window.__aaAddMockReaction("👍"));
+          btn("custom hotkeys: on", () =>
+            AA.overlayRegistry.enable("customHotkeys", {
+              enabled: true,
+              toggleMicKey: "alt+m",
+              toggleCameraKey: "alt+c",
+              hangUpKey: "alt+h",
+            })
+          );
+          btn("custom hotkeys: off", () => AA.overlayRegistry.disable("customHotkeys"));
+          btn("live captions: on", () => AA.overlayRegistry.enable("liveCaptions", { enabled: true }));
+          btn("live captions: off", () => AA.overlayRegistry.disable("liveCaptions"));
+          btn("ai recap: on", () => AA.overlayRegistry.enable("aiRecap", { enabled: true, windowSeconds: 120 }));
+          btn("ai recap: off", () => AA.overlayRegistry.disable("aiRecap"));
+          btn("simulate mock caption text", () => window.__aaSetMockCaption("hello from the mock"));
+          btn("click catch-me-up button", () => document.getElementById("aa-ai-recap-button")?.click());
+        }
+
+        if (AA.inviteLink) {
+          section("invite-link");
+          btn("log decoded hash preset", () => console.info("decoded preset:", JSON.stringify(AA.inviteLink.decode(location.hash))));
+        }
+
+        console.info("MeetAssist harness ready. AA namespace:", Object.keys(AA));
+      } catch (err) {
+        console.error("harness init failed", err);
+      }
+    });
+  </script>
+</body>
+</html>

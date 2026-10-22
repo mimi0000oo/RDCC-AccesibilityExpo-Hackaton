@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mock Google Meet (bare) — real content-script injection target</title>
+<style>
+  :root { --bg: #202124; --fg: #e8eaed; }
+  body.theme-light { --bg: #ffffff; --fg: #202124; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Google Sans", Arial, sans-serif; background: var(--bg); color: var(--fg); height: 100vh; display: flex; flex-direction: column; }
+  #call-area { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; padding: 16px; align-content: start; }
+  .tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
+  .tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile .label { position: absolute; bottom: 6px; left: 8px; font-size: 12px; background: rgba(0,0,0,.5); padding: 2px 8px; border-radius: 4px; }
+  #toolbar { height: 64px; background: #000; display: flex; align-items: center; justify-content: center; gap: 16px; }
+</style>
+</head>
+<body>
+  <!--
+    This page is deliberately "bare": it has NO <script src> tags for any
+    MeetAssist module. Those are expected to arrive via the real Chrome
+    extension content_scripts mechanism (manifest.json), matched against the
+    https://meet.google.com/* host pattern — see tests/run.js's
+    checkRealContentScriptInjection(). This is what proves content-main.js
+    and the manifest's content_scripts array actually work end-to-end,
+    as opposed to tests/mock-meet.html which hand-includes the module
+    scripts for fast, cert-free iteration during development.
+  -->
+  <div id="call-area"></div>
+  <div id="toolbar">
+    <button id="toggle-theme" title="Toggle theme">theme</button>
+    <button id="toggle-screenshare" title="Toggle screenshare">screenshare</button>
+    <button id="add-tile" title="Add participant">add</button>
+  </div>
+
+  <script>
+    const callArea = document.getElementById("call-area");
+    let tileCount = 0;
+
+    function makeFakeTile(width, height, label, hueA, hueB, screenshare) {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const g = canvas.getContext("2d");
+      let hue = hueA;
+
+      function draw() {
+        const grad = g.createLinearGradient(0, 0, width, height);
+        grad.addColorStop(0, `hsl(${hue}, 70%, 45%)`);
+        grad.addColorStop(1, `hsl(${hueB}, 70%, 30%)`);
+        g.fillStyle = grad;
+        g.fillRect(0, 0, width, height);
+        g.fillStyle = "#fff";
+        g.font = "bold 28px sans-serif";
+        g.fillText(label, 20, 40);
+        hue = (hue + 1) % 360;
+      }
+      draw();
+      const stream = canvas.captureStream(15);
+      const timer = setInterval(draw, 200);
+
+      const tile = document.createElement("div");
+      tile.className = "tile" + (screenshare ? " screenshare" : "");
+      tile.dataset.timer = String(timer);
+
+      const video = document.createElement("video");
+      video.autoplay = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      tile.appendChild(video);
+
+      const labelEl = document.createElement("div");
+      labelEl.className = "label";
+      labelEl.textContent = label;
+      tile.appendChild(labelEl);
+
+      return tile;
+    }
+
+    function addParticipantTile() {
+      tileCount += 1;
+      const tile = makeFakeTile(320, 180, `Participant ${tileCount}`, (tileCount * 47) % 360, (tileCount * 47 + 60) % 360, false);
+      callArea.appendChild(tile);
+      return tile;
+    }
+
+    document.getElementById("add-tile").addEventListener("click", addParticipantTile);
+    document.getElementById("toggle-theme").addEventListener("click", () => document.body.classList.toggle("theme-light"));
+
+    addParticipantTile();
+    addParticipantTile();
+    addParticipantTile();
+  </script>
+</body>
+</html>

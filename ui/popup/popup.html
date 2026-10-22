@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>MeetAssist</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="aa-page">
+    <header>
+      <div class="aa-header-row">
+        <div>
+          <h1>MeetAssist</h1>
+        </div>
+        <div class="aa-header-buttons">
+          <button id="aa-theme-btn" type="button" class="aa-theme-btn">Theme: Light</button>
+          <button id="aa-reset-btn" type="button" class="aa-reset-btn">Reset</button>
+        </div>
+      </div>
+    </header>
+    <p id="aa-offsite-notice">Open a Google Meet tab to see live module status. Preferences below still apply on your next Meet call.</p>
+
+    <section id="aa-conditions-section" class="aa-conditions-section">
+      <h2>What would help you?</h2>
+      <p class="aa-hint">Pick what applies — it turns on the right modules below with sensible defaults. You can fine-tune or turn anything off afterward.</p>
+      <div id="aa-conditions-body"></div>
+    </section>
+  </div>
+
+  <script src="../../utils/logger.js"></script>
+  <script src="../../utils/storage.js"></script>
+  <script src="../../utils/messaging.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

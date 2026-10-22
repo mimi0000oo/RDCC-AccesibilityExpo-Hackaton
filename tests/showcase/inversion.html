@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Smart Color Inversion Filter — Showcase</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --text: #1b1d22;
+    --muted: #5a5f6b;
+    --accent: #3457d5;
+    --border: #d9dce2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 24px 32px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; color: var(--muted); }
+
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 32px 48px;
+  }
+
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+  section h2 { margin-top: 0; font-size: 16px; }
+  section p { color: var(--muted); }
+
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  button {
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  button.secondary { background: var(--panel); color: var(--text); }
+  button:focus-visible { outline: 3px solid #ffb703; outline-offset: 2px; }
+  #status { font-weight: 600; margin-left: 8px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+
+  /* Fake "video tile" elements — stand-ins for the <video> elements Meet
+     would render. Photo-like gradients so you can visually judge whether
+     smart-invert left them alone. */
+  .tile {
+    height: 140px;
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-end;
+    padding: 8px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  }
+  .tile--sunset { background: linear-gradient(160deg, #ff9966, #ff5e62 45%, #2b1055); }
+  .tile--forest { background: linear-gradient(160deg, #a8e063, #56ab2f 50%, #134e5e); }
+  .tile--ocean  { background: linear-gradient(160deg, #36d1dc, #5b86e5 60%, #09203f); }
+
+  .photo-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+  .photo-row img {
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  #log {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    background: #11131a;
+    color: #c9f7c9;
+    border-radius: 8px;
+    padding: 12px;
+    height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  #log .line-warn { color: #ffd27f; }
+  #log .line-error { color: #ff8f8f; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Smart Color Inversion Filter — Showcase</h1>
+  <p>Standalone harness for <code>content/filters/inversion.js</code>. "Smart" invert flips page chrome but
+     exempts video tiles / images from the double-flip so photos never look like film negatives.
+     "Dim only" is the independent brightness knob (no inversion) — the actual fix for photophobia,
+     since inverting an already-dark UI makes it brighter, not darker.</p>
+</header>
+
+<main>
+  <section>
+    <h2>Controls</h2>
+    <div class="controls">
+      <button id="btn-off" class="secondary">Off</button>
+      <button id="btn-smart">Invert (smart)</button>
+      <button id="btn-full">Invert (full)</button>
+      <button id="btn-dim">Dim only (photophobia)</button>
+      <span id="status">mode: off</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Simulated call grid (fake video tiles)</h2>
+    <p>These <code>.tile</code> divs stand in for Meet's video elements — the showcase's fake
+       <code>meet.getVideoTiles()</code> returns them (see script comment below).</p>
+    <div class="grid">
+      <div class="tile tile--sunset">Participant A</div>
+      <div class="tile tile--forest">Participant B</div>
+      <div class="tile tile--ocean">Participant C</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Inline image (not a tile, still exempt under smart invert)</h2>
+    <p>The module exempts every <code>&lt;img&gt;</code> on the page, not just tiles — this one is a
+       data-URI SVG, no network fetch involved.</p>
+    <div class="photo-row">
+      <img id="demo-img" alt="Sample gradient photo" />
+      <p>A profile photo or shared image like this should look identical in "smart" and "off" modes,
+         but would look like a negative in "full" invert mode.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ordinary page chrome (should invert normally in both modes)</h2>
+    <p>This paragraph, the header above, and these buttons are plain page UI — they are expected to
+       invert in both "smart" and "full" modes, since the root <code>&lt;html&gt;</code> filter always
+       applies. Only tiles/images get the counter-filter exemption.</p>
+    <button class="secondary" id="noop-btn">Decorative button (no handler)</button>
+  </section>
+
+  <section>
+    <h2>Console log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script src="../../utils/logger.js"></script>
+<script src="../../utils/perf.js"></script>
+<script>
+  // Minimal registry stub so inversion.js's self-registration call
+  // (AA.filterRegistry?.register(...)) no-ops instead of throwing — this
+  // showcase drives the module directly via init()/enable()/update()/disable()
+  // rather than through the real filter-registry.
+  window.AA = window.AA || {};
+  window.AA.filterRegistry = { register: () => {} };
+</script>
+<script src="../../content/filters/inversion.js"></script>
+<script>
+  (function () {
+    "use strict";
+
+    // Mirror console output onto the page, before building the fake ctx so
+    // every module log line shows up here too.
+    const logEl = document.getElementById("log");
+    function appendLine(cls, args) {
+      const line = document.createElement("div");
+      if (cls) line.className = cls;
+      line.textContent = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    const nativeLog = console.log.bind(console);
+    const nativeWarn = console.warn.bind(console);
+    const nativeError = console.error.bind(console);
+    console.log = (...args) => { appendLine("", args); nativeLog(...args); };
+    console.info = console.log;
+    console.debug = console.log;
+    console.warn = (...args) => { appendLine("line-warn", args); nativeWarn(...args); };
+    console.error = (...args) => { appendLine("line-error", args); nativeError(...args); };
+
+    // A simple colorful SVG photo stand-in, inlined as a data URI (no
+    // network fetch — ARCHITECTURE.md §8 forbids remote resources anyway).
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffd166"/>
+            <stop offset="50%" stop-color="#ef476f"/>
+            <stop offset="100%" stop-color="#118ab2"/>
+          </linearGradient>
+        </defs>
+        <rect width="200" height="200" fill="url(#g)"/>
+        <circle cx="140" cy="60" r="28" fill="#fffbe6"/>
+        <polygon points="0,200 70,100 120,160 160,110 200,200" fill="#06302b" opacity="0.7"/>
+      </svg>`;
+    document.getElementById("demo-img").src = "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+
+    // Fake MeetSurface: the real one (content/dom/meet-observer.js) returns
+    // live <video> elements; here we just return the .tile divs on the page.
+    // getVideoTiles() is read fresh each call, and `on()` is a no-op
+    // unsubscribe since this static showcase never actually mutates the
+    // tile set after load.
+    const fakeMeet = {
+      getVideoTiles: () => Array.from(document.querySelectorAll(".tile")),
+      getScreenshareNode: () => null,
+      getTheme: () => "light",
+      on: () => () => {},
+    };
+
+    const ctx = {
+      meet: fakeMeet,
+      storage: null,
+      logger: window.AA.logger.scope("showcase"),
+      reportError: (err) => console.error("[showcase] reportError:", err),
+    };
+
+    const mod = window.AA.filters.inversion;
+    mod.init(ctx);
+
+    const statusEl = document.getElementById("status");
+    let isOn = false;
+
+    function setStatus(text) {
+      statusEl.textContent = "mode: " + text;
+    }
+
+    document.getElementById("btn-off").addEventListener("click", () => {
+      mod.disable();
+      isOn = false;
+      setStatus("off");
+    });
+
+    document.getElementById("btn-smart").addEventListener("click", () => {
+      if (!isOn) {
+        mod.enable({ enabled: true, smart: true, invertColors: true, brightness: 1 });
+        isOn = true;
+      } else {
+        mod.update({ smart: true, invertColors: true, brightness: 1 }); // live toggle, no teardown/rebuild
+      }
+      setStatus("smart invert");
+    });
+
+    document.getElementById("btn-full").addEventListener("click", () => {
+      if (!isOn) {
+        mod.enable({ enabled: true, smart: false, invertColors: true, brightness: 1 });
+        isOn = true;
+      } else {
+        mod.update({ smart: false, invertColors: true, brightness: 1 }); // live toggle, no teardown/rebuild
+      }
+      setStatus("full invert");
+    });
+
+    // The photophobia fix: brightness-only dim, no color inversion at all —
+    // unlike full invert, this actually darkens an already-dark UI instead
+    // of brightening it.
+    document.getElementById("btn-dim").addEventListener("click", () => {
+      if (!isOn) {
+        mod.enable({ enabled: true, invertColors: false, brightness: 0.6 });
+        isOn = true;
+      } else {
+        mod.update({ invertColors: false, brightness: 0.6 });
+      }
+      setStatus("dim only (60% brightness)");
+    });
+
+    console.log("Showcase ready. Click a mode button to try the filter.");
+  })();
+</script>
+
+</body>
+</html>
